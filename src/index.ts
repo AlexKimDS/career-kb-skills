@@ -2,13 +2,20 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { searchKb, getFullFile } from "./search.js";
-import { readFile, writeKbFile, listDir, loadIndex } from "./kb.js";
+import { readFile, writeKbFile, listDir, loadIndex, ensureFresh } from "./kb.js";
 import { projectTemplate, interviewTemplate, entryTemplate } from "./templates.js";
 
 const server = new McpServer({
   name: "career-kb",
   version: "1.0.0",
 });
+
+function freshnessNotice(): string {
+  const { pulled, warning } = ensureFresh();
+  if (warning) return `> ⚠️ KB freshness: ${warning}\n\n`;
+  if (pulled) return `> ✅ KB updated from GitHub.\n\n`;
+  return "";
+}
 
 // ── search_kb ──────────────────────────────────────────────────────────────
 
@@ -24,9 +31,10 @@ server.tool(
     limit: z.number().int().min(1).max(20).optional().default(5),
   },
   async ({ query, type, limit }) => {
+    const notice = freshnessNotice();
     const results = searchKb(query, type, limit);
     if (results.length === 0) {
-      return { content: [{ type: "text", text: "No results found." }] };
+      return { content: [{ type: "text", text: notice + "No results found." }] };
     }
     const text = results
       .map(
@@ -34,7 +42,7 @@ server.tool(
           `**${r.path}** (score: ${r.score})\n${r.preview}\n---`
       )
       .join("\n");
-    return { content: [{ type: "text", text }] };
+    return { content: [{ type: "text", text: notice + text }] };
   }
 );
 
@@ -47,6 +55,7 @@ server.tool(
     slug: z.string().describe("Project folder name under projects/"),
   },
   async ({ slug }) => {
+    const notice = freshnessNotice();
     const files = ["README.md", "context.md", "metrics.md"];
     const parts: string[] = [];
     for (const file of files) {
@@ -59,10 +68,10 @@ server.tool(
     }
     if (parts.length === 0) {
       return {
-        content: [{ type: "text", text: `Project '${slug}' not found.` }],
+        content: [{ type: "text", text: notice + `Project '${slug}' not found.` }],
       };
     }
-    return { content: [{ type: "text", text: parts.join("\n\n") }] };
+    return { content: [{ type: "text", text: notice + parts.join("\n\n") }] };
   }
 );
 
@@ -82,6 +91,7 @@ server.tool(
       .describe("Number of post samples to include"),
   },
   async ({ samples }) => {
+    const notice = freshnessNotice();
     const parts: string[] = [];
 
     try {
@@ -99,7 +109,7 @@ server.tool(
       }
     }
 
-    return { content: [{ type: "text", text: parts.join("\n\n---\n\n") }] };
+    return { content: [{ type: "text", text: notice + parts.join("\n\n---\n\n") }] };
   }
 );
 
@@ -110,11 +120,12 @@ server.tool(
   "Retrieve the current career status: role, what you're open to, and goals.",
   {},
   async () => {
+    const notice = freshnessNotice();
     try {
       const content = readFile("status/current.md");
-      return { content: [{ type: "text", text: content }] };
+      return { content: [{ type: "text", text: notice + content }] };
     } catch {
-      return { content: [{ type: "text", text: "status/current.md not found." }] };
+      return { content: [{ type: "text", text: notice + "status/current.md not found." }] };
     }
   }
 );
@@ -131,16 +142,17 @@ server.tool(
       .describe("Filter by project stage"),
   },
   async ({ stage }) => {
+    const notice = freshnessNotice();
     const index = loadIndex();
     let projects = index.filter((e) => e.path.startsWith("projects/") && e.path.endsWith("README.md"));
     if (stage) projects = projects.filter((e) => e.stage === stage);
     if (projects.length === 0) {
-      return { content: [{ type: "text", text: "No projects found." }] };
+      return { content: [{ type: "text", text: notice + "No projects found." }] };
     }
     const text = projects
       .map((p) => `- **${p.path}** | stage: ${p.stage || "?"} | ${p.preview.slice(0, 100)}`)
       .join("\n");
-    return { content: [{ type: "text", text }] };
+    return { content: [{ type: "text", text: notice + text }] };
   }
 );
 
@@ -233,11 +245,12 @@ server.tool(
     path: z.string().describe("Relative path from the KB root, e.g. profile/bio.md"),
   },
   async ({ path: filePath }) => {
+    const notice = freshnessNotice();
     try {
       const content = readFile(filePath);
-      return { content: [{ type: "text", text: content }] };
+      return { content: [{ type: "text", text: notice + content }] };
     } catch {
-      return { content: [{ type: "text", text: `File not found: ${filePath}` }] };
+      return { content: [{ type: "text", text: notice + `File not found: ${filePath}` }] };
     }
   }
 );
