@@ -102,6 +102,38 @@ Edit `~/.config/zed/settings.json`:
 }
 ```
 
+## Claude Code Skills
+
+In addition to the MCP server, this repo includes Claude Code slash command skills — markdown instruction files that Claude executes when invoked with `/command-name`.
+
+Install a skill by copying it to `~/.claude/commands/`:
+
+```bash
+cp commands/tailor-cv.md ~/.claude/commands/tailor-cv.md
+```
+
+### Available skills
+
+#### `/tailor-cv <JD_URL>`
+
+Tailors the CV for a specific job application and generates a matching cover letter.
+
+**What it does:**
+1. Crawls the job description URL
+2. Pulls relevant context from the career KB (experience, projects, writing style)
+3. Creates an isolated git branch in the CV repo (`cv/{company}-{role}`)
+4. Tailors CV sections to match the JD — reorders, keyword-matches, adjusts emphasis. Never fabricates facts.
+5. Generates a cover letter with company-specific "Why them / Why me" sections
+6. Compiles both to PDF via `latexmk` and opens them
+7. Commits everything on the branch; `main` is never touched
+
+**Requires:**
+- The `career-kb` MCP server configured and running (see Setup above)
+- The CV repo (`overleaf-cv`) — a LaTeX project using the [Awesome-CV](https://github.com/posquit0/Awesome-CV) template that compiles to a PDF résumé. The repo holds modular `.tex` section files (`resume/summary.tex`, `resume/experience.tex`, etc.) and a per-variant main file (`resume_isr.tex`) that `\input`s them.
+- `latexmk` installed (`brew install --cask mactex-no-gui`)
+
+---
+
 ## First-time index build
 
 The search index builds automatically on push via GitHub Action.
