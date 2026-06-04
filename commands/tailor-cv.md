@@ -1,69 +1,88 @@
 Tailor Aleksandr Kim's CV and generate a cover letter for a specific job application.
 
-**Usage:** `/tailor-cv <JD_URL>`
+**Usage:** `/tailor-cv <JD_URL or pasted JD text>`
 
 The argument is: $ARGUMENTS
 
 ---
 
-## Your task
+## Operating principle
 
-Given a job description URL, you will:
-1. Crawl the JD
-2. Load relevant career KB context
-3. Read the current CV files
-4. Create an isolated git branch in the CV repo
-5. Tailor CV sections to match the role (non-destructively)
-6. Generate a targeted cover letter
-7. Compile both to PDF and open them
-8. Commit and report
+This command is evidence-gated. You may tailor wording and ordering, but every factual claim, number, project, company, and metric used in the CV must come from a structured CV evidence claim.
 
-Follow every step below in order. Do not skip steps.
+Primary tools:
+- `match_jd_to_evidence` — use this as the primary source for CV facts.
+- `get_claims` — fetch exact source-bound claims before writing.
+- `validate_cv_facts` — run before compile/commit.
+- `search_kb` / `get_file` — use only for extra context after evidence claims are selected.
+
+Do not use generic KB search as the primary CV input.
 
 ---
 
-## Step 1 — Crawl the JD
+## Step 1 — Load the JD
 
-Use `WebFetch` on the URL provided in $ARGUMENTS.
+If `$ARGUMENTS` is a URL, use `WebFetch` on it. If `$ARGUMENTS` is pasted JD text, use it directly.
 
 Extract and record:
-- **Company name** (exact, as written on the page)
-- **Role title** (exact)
-- **Required skills / qualifications** (bulleted list)
-- **Nice-to-have skills**
-- **Keywords that appear 3+ times** (these are the ones that matter for ATS)
-- **Seniority signals** (IC vs lead, years of experience asked, scope)
-- **What the role is actually about** (1–2 sentence plain summary)
+- Company name, exactly as written.
+- Role title, exactly as written.
+- Required skills and qualifications.
+- Nice-to-have skills.
+- Keywords that appear 3+ times.
+- Seniority signals: IC vs lead, years, scope, ownership.
+- What the role is actually about in 1-2 plain sentences.
 
-If the URL fails to load or is behind a login wall, stop and ask the user to paste the JD text directly.
-
----
-
-## Step 2 — Load KB context
-
-Call these career-kb MCP tools:
-- `get_current_status` — current role and what you're open to
-- `search_kb` with the role title + top 3 JD keywords — find relevant experience and projects
-- `get_style` with `samples: 3` — writing style reference (use this to keep the CV tone consistent)
+If the URL fails or is behind a login wall, stop and ask the user to paste the JD text.
 
 ---
 
-## Step 3 — Read the current CV
+## Step 2 — Evidence shortlist
+
+Call:
+- `get_current_status`
+- `match_jd_to_evidence` with the full JD text and `limit: 12`
+- `get_style` with `samples: 3`
+
+Then choose:
+- 2-3 `headline` claims for the summary.
+- 4-6 strongest claims for experience bullets.
+- 1-3 claims for selected projects, only if projects add technical depth not already covered by experience.
+
+Use `get_claims` for every selected claim ID.
+
+Before editing files, output a concise fit thesis:
+
+```text
+## Evidence plan
+Top fit thesis: ...
+Summary claims: claim_id, claim_id, ...
+Experience claims: claim_id, claim_id, ...
+Project claims: claim_id, claim_id, ...
+Claims excluded: claim_id — reason
+```
+
+Hard stop if honest tailoring is not possible because the role is too far outside Alex's background.
+
+---
+
+## Step 3 — Read the CV repo
 
 Read these files from `/Users/alexkim/my-projects/overleaf-cv/`:
-- `resume_isr.tex` — the canonical main template
+- `resume_isr.tex`
 - `resume/summary.tex`
 - `resume/skills.tex`
 - `resume/experience.tex`
 - `resume/project.tex`
 - `resume/education.tex`
+- `coverletter.tex`
 
-Also read `coverletter.tex` for the cover letter structure.
+Check the branch:
 
-Check the current git branch:
 ```bash
 cd /Users/alexkim/my-projects/overleaf-cv && git branch --show-current
 ```
+
 If not on `main`, warn the user and stop. Only proceed from `main`.
 
 ---
@@ -71,8 +90,8 @@ If not on `main`, warn the user and stop. Only proceed from `main`.
 ## Step 4 — Create the branch
 
 Derive slugs:
-- Company slug: lowercase, hyphens, no special chars (e.g. "Google" → `google`, "DeepMind" → `deepmind`)
-- Role slug: lowercase, hyphens, key words only (e.g. "Senior AI Engineer" → `senior-ai-engineer`)
+- Company slug: lowercase, hyphens, no special chars.
+- Role slug: lowercase, hyphens, key words only.
 - Branch name: `cv/{company-slug}-{role-slug}`
 
 ```bash
@@ -83,48 +102,102 @@ cd /Users/alexkim/my-projects/overleaf-cv && git checkout -b cv/{company-slug}-{
 
 ## Step 5 — Create the per-application main file
 
-Copy `resume_isr.tex` to `resume_{company-slug}.tex`. Then make these targeted edits to the copy:
+Copy `resume_isr.tex` to `resume_{company-slug}.tex`. Edit only the copy:
 
-1. **`\position{...}`** — update to match the JD role title, but only if it's a genuine match to your background (Senior Data Scientist, Senior AI Engineer, Staff DS, etc.). Do not fabricate a title you haven't held.
-2. **Uncomment `\input{resume/project.tex}`** — always include projects.
-3. **Section order** — ensure the `\input` order is: summary → skills → experience → project → education. Update if different.
-4. **Output filename hint** — add a comment at the top: `% Application: {Company} — {Role}`
+1. Add `% Application: {Company} — {Role}` near the top.
+2. Set `\position{...}` to an honest role-matched title in ALL CAPS, for example `SENIOR AI ENGINEER \textbar{} AGENT SYSTEMS`.
+3. Ensure section order is: summary → skills → experience → project → education.
+4. Uncomment `\input{resume/project.tex}` only if the selected project claims add non-duplicative value.
+5. Add this rendering fix after the existing `\makeatletter...\makeatother` block:
 
-Do NOT modify `resume_isr.tex` itself.
+```latex
+% Prevent text overlap under XeLaTeX (legacy 2020).
+% cvitems close (-4mm) + cventry open (-3mm) = -7mm, overrunning 11pt line height.
+% Fix: zero out closing vspace; leave open vspace as-is to preserve density.
+\renewenvironment{cvitems}{%
+  \vspace{-4.0mm}
+  \begin{justify}
+  \begin{itemize}[leftmargin=2ex, nosep, noitemsep]
+    \setlength{\parskip}{0pt}
+    \renewcommand{\labelitemi}{\bullet}
+}{%
+  \end{itemize}
+  \end{justify}
+  \vspace{0mm}
+}
+\makeatletter
+\patchcmd{\cventry}{\vspace{-3.0mm}}{\vspace{-2.0mm}}{}{}
+\makeatother
+```
+
+Do not modify `resume_isr.tex`.
 
 ---
 
-## Step 6 — Tailor the section files
+## Step 6 — Tailor section files
 
-Edit these files **in place** on the branch. The originals on `main` are protected by the branch — that's your safety net.
+Edit these files in place on the branch:
+- `resume/summary.tex`
+- `resume/skills.tex`
+- `resume/experience.tex`
+- `resume/project.tex` if included
 
-### Rules that apply to ALL sections
-- Never fabricate facts, metrics, companies, titles, or skills
-- Only reframe, reorder, and keyword-swap what already exists
-- Keep ALL existing LaTeX comments (`%`) intact — they are alternative versions for future use
-- Do not break any `\begin{...}` / `\end{...}` pairs
-- Do not change `resume/education.tex` or `resume/languages.tex`
+Rules for all sections:
+- Never fabricate facts, metrics, companies, titles, or skills.
+- Use only selected claim IDs for summary and top bullets.
+- Do not combine metrics from different claim IDs in one bullet unless the same claim supports all of them.
+- Preserve all existing LaTeX comments.
+- Do not change `resume/education.tex` or `resume/languages.tex`.
+- Keep every `\cventry` job title in ALL CAPS.
+- Do not leave claim IDs in the final rendered CV unless they are LaTeX comments.
+
+Maintain a scratch claim map while editing:
+
+```text
+summary sentence 1 -> claim_id
+experience bullet: Intuit #1 -> claim_id
+project bullet: Agentic Insights -> claim_id
+```
 
 ### `resume/summary.tex`
-Rewrite **only the active paragraph** (the uncommented one between `\begin{cvparagraph}` and `\end{cvparagraph}`). Keep commented-out alternatives untouched.
 
-The new summary should:
-- Open with the role title from the JD (or closest match to your actual title)
-- Emphasise the 2–3 experiences most relevant to this JD
-- Include 2–3 of the JD's high-frequency keywords naturally
-- Stay 2–4 sentences max
-- Sound like the existing writing style (reference `get_style` output)
+Rewrite only the active paragraph between `\begin{cvparagraph}` and `\end{cvparagraph}`.
+
+Summary rules:
+- Use only the 2-3 selected headline claims.
+- Lead with the target role category and strongest fit.
+- Include 2-3 high-frequency JD keywords naturally.
+- Stay 2-3 tight sentences.
+- Do not mention weaker early-career facts unless the JD specifically requires them.
 
 ### `resume/skills.tex`
-Reorder `\cvskill` rows so the most JD-relevant category appears first. Within each row, reorder the comma-separated items so JD-matching skills lead. Add JD keywords only if they are genuinely equivalent to skills you already list (e.g. if JD says "LangChain" and you list "LangGraph", you may add "LangChain" alongside it — they are peers).
+
+Reorder categories and skill items by JD relevance.
+
+Only add a JD keyword if it is already supported by the selected claims or existing skills. Example: adding `LangChain` beside `LangGraph` is allowed only if the role clearly values agent frameworks and the CV already shows adjacent agent-framework work.
 
 ### `resume/experience.tex`
-For each `\cventry`, reorder `\item` bullet points so the most JD-relevant achievement appears first. You may rephrase a bullet to include a JD keyword **only if the underlying fact is unchanged** — same metric, same scope, just different vocabulary. Never move bullets between companies or roles.
+
+Reorder bullets within each role so the strongest JD-matched claim comes first.
+
+Experience prioritization:
+1. Recent Intuit London production AI/LLM claims.
+2. Intuit Israel LLM evaluation, Responsible AI, fintech-scale ML claims.
+3. X5 leadership/scale claims for management or large-scale ML roles.
+4. Kaspersky NLP/BERT claim for NLP-heavy roles.
+5. Early-career or weak claims only when specifically relevant.
+
+Never move bullets between companies or roles.
 
 ### `resume/project.tex`
-- Change `\cvsection{Projects}` → `\cvsection{Selected Projects}`
-- Reorder `\cventry` blocks so the most JD-relevant project appears first
-- Do not edit project descriptions — only reorder
+
+Use this section only when it adds technical architecture or domain depth beyond experience bullets.
+
+Rules:
+- Change `\cvsection{Projects}` to `\cvsection{Selected Projects}`.
+- Do not repeat the same story and metric already used in experience.
+- Project bullets should explain implementation shape, architecture, or technical depth.
+- Exclude cancelled projects and weak early-career projects unless the JD specifically asks for that story.
 
 ---
 
@@ -132,69 +205,143 @@ For each `\cventry`, reorder `\item` bullet points so the most JD-relevant achie
 
 Create `/Users/alexkim/my-projects/overleaf-cv/cover_letter_{company-slug}.tex`.
 
-Use `coverletter.tex` as the structural template. Copy its full LaTeX preamble and structure. Then fill in:
+Use `coverletter.tex` as the structural template and copy its full LaTeX preamble.
 
-**Header block** (copy from `resume_isr.tex`):
+Header block:
 - `\name{Aleksandr Kim}{}`
-- `\position{Senior AI Engineer}` (or role-matched title)
+- `\position{SENIOR AI ENGINEER}` or an honest role-matched title.
 - `\address{London, UK}`
 - `\mobile{+44 7555 850960}`
 - `\email{aleksandr.v.kim@gmail.com}`
 - `\homepage{alexkimds.github.io}`
 - `\linkedin{aleksandrkim}`
 
-**Letter metadata:**
+Metadata:
 - `\lettertitle{Job Application for {Role} at {Company}}`
-- `\letteropening{Dear Hiring Manager,}` (keep generic unless the JD names a specific team or person)
+- `\letteropening{Dear Hiring Manager,}`
 - `\letterclosing{Sincerely,}`
 
-**Letter body — three `\lettersection` blocks inside `\begin{cvletter}...\end{cvletter}`:**
-
-1. `\lettersection{About Me}` — 3–4 sentences. Who you are, your current role, one headline achievement relevant to this JD. Do not repeat the CV verbatim — this should read as a human introduction.
-
-2. `\lettersection{Why {Company}?}` — 2–3 sentences. What specifically about this company, product, or role draws you. Use concrete signals from the JD (their tech stack, mission, scale, problem domain). Do not write generic flattery.
-
-3. `\lettersection{Why Me?}` — 4–5 sentences. Map your 3 strongest matching experiences directly to their stated requirements. Use metrics. Be concrete. End with one sentence on what you would bring that is additive — not just a match, but a differentiator.
-
-Keep the tone consistent with the KB writing style samples.
+Body:
+1. `\lettersection{About Me}` — current role and one headline claim.
+2. `\lettersection{Why {Company}?}` — concrete company/JD signals, not generic flattery.
+3. `\lettersection{Why Me?}` — map 3 strongest selected claims to requirements. Use metrics only from claim IDs.
 
 ---
 
-## Step 8 — Compile and verify
+## Step 8 — Validate facts before compiling
 
-First check for `latexmk`:
+Run `validate_cv_facts` on the edited LaTeX content from:
+- `resume/summary.tex`
+- `resume/experience.tex`
+- `resume/project.tex` if included
+- `cover_letter_{company-slug}.tex`
+
+If unsupported numbers or possible mixed facts are reported:
+1. Re-check the relevant selected claim with `get_claims`.
+2. Fix the wording or remove the unsupported metric.
+3. Re-run `validate_cv_facts`.
+
+Do not compile or commit until the validator reports no unsupported numbers and no possible mixed facts, unless the remaining item is a false positive you explicitly explain in the final report.
+
+---
+
+## Step 9 — Compile and visually verify
+
+Check for `latexmk`:
+
 ```bash
 which latexmk
 ```
 
 If missing, tell the user:
-> `latexmk` not found. Run `brew install --cask mactex-no-gui` to install MacTeX (this takes a few minutes). Let me know when done and I'll re-run.
+`latexmk` not found. Run `brew install --cask mactex-no-gui` to install MacTeX. Let me know when done and I'll re-run.
 
-Then stop and wait.
+Then stop.
 
-If present, compile from the repo directory:
+If present:
+
 ```bash
 cd /Users/alexkim/my-projects/overleaf-cv
 latexmk -xelatex -interaction=nonstopmode -halt-on-error resume_{company-slug}.tex 2>&1 | tail -30
 latexmk -xelatex -interaction=nonstopmode -halt-on-error cover_letter_{company-slug}.tex 2>&1 | tail -30
-```
-
-**On compile error:**
-- Show the relevant error lines (look for lines starting with `!` in the output)
-- Identify which section file caused it
-- Fix the LaTeX syntax error in that file (most likely a stray `&`, `_`, `#`, `%` or broken environment)
-- Re-run the compile
-- If it still fails after one fix attempt, revert that section file to its pre-edit state and report clearly what failed
-
-**On success:**
-```bash
 open resume_{company-slug}.pdf
 open cover_letter_{company-slug}.pdf
 ```
 
+Overleaf note: use XeLaTeX and TeX Live 2020 (Legacy) if uploading to Overleaf.
+
+Generate previews:
+
+```bash
+mkdir -p /tmp/cv_preview
+qlmanage -t -s 1400 -o /tmp/cv_preview/ resume_{company-slug}.pdf 2>/dev/null
+qlmanage -t -s 1400 -o /tmp/cv_preview/ cover_letter_{company-slug}.pdf 2>/dev/null
+```
+
+Read and visually inspect:
+- `/tmp/cv_preview/resume_{company-slug}.pdf.png`
+- `/tmp/cv_preview/cover_letter_{company-slug}.pdf.png`
+
+### CV post-update checklist
+
+Run this after every compile. Do not commit until every item passes.
+
+#### Visual
+
+- [ ] No text overlap anywhere on the page (compare screenshot pixel-by-pixel if unsure)
+- [ ] CV is exactly 1 page; cover letter is exactly 1 page
+- [ ] Gaps between sections are consistent — not too wide, not too narrow
+- [ ] Last bullet of each `cventry` is not crammed against the next `cventry` header
+- [ ] Selected Projects section: gap between section title and first entry is normal-width
+      (a too-wide gap usually means the first `cvproject` has an empty org field)
+- [ ] All `\position{}` and `\cventry` job titles are ALL CAPS
+      (`\scshape` turns title-case "Senior AI Engineer" into "SENiOR AI ENGiNEER")
+- [ ] Contact header order: portfolio/clickable link is first (not buried after phone/email)
+- [ ] All experience entry indentation is consistent (check X5 and older entries)
+- [ ] No text overflows the bottom margin
+
+#### Content — no duplication
+
+- [ ] No bullet appears in both experience AND selected projects (same story, same metric)
+- [ ] Each project in "Selected Projects" tells a different story from its experience block
+      (architecture / depth angle is fine; re-stating the same outcome is not)
+
+#### Content — correct attribution
+
+- [ ] Every bullet is under the company it actually happened at
+      (never move bullets between Intuit London, Intuit Israel, X5, Kaspersky, Raiffeisen)
+- [ ] Employment date ranges are correct for each role:
+      - Intuit London: Sep 2024 – present
+      - Intuit Israel: ~2021 – Aug 2024
+      - X5 Retail: 2019 – 2021
+      - Kaspersky: 2018 – 2019
+      - Raiffeisen Bank: 2016 – 2018
+- [ ] No internal codenames in any public-facing bullet:
+      "Blob Bot" → "Agentic Insights Platform / LangGraph agent"
+      "ADVIL" → "LLM-as-Judge Triage System" (or similar external description)
+
+#### Content — metric precision
+
+- [ ] No overly broad ranges that look odd (e.g., "20-80%")
+      Replace with "~80%", "up to 80%", or split into two separate bullets with one metric each
+- [ ] All metrics validated by `validate_cv_facts` (no unsupported numbers)
+
+#### Content — completeness
+
+- [ ] Kaspersky is present as its own separate experience entry (not merged or omitted)
+- [ ] Raiffeisen Bank is present as its own separate experience entry (not merged or omitted)
+- [ ] Summary is 2-3 tight sentences (not shorter, not longer)
+- [ ] Top half of the CV contains the strongest JD-matched facts
+
+If visual check fails:
+1. Shorten summary to 2 tight sentences.
+2. Remove or comment out the least relevant old role/bullet.
+3. Reduce highest-bullet-count entry to top 3-4 bullets.
+4. Recompile and re-screenshot.
+
 ---
 
-## Step 9 — Commit
+## Step 10 — Commit
 
 ```bash
 cd /Users/alexkim/my-projects/overleaf-cv
@@ -204,28 +351,35 @@ git commit -m "cv: tailor for {Company} — {Role}"
 
 ---
 
-## Step 10 — Report
+## Step 11 — Report
 
-Output a clean summary:
+Output:
 
-```
+```text
 ## CV tailored for {Company} — {Role}
 
-**Branch:** cv/{company-slug}-{role-slug}
-**CV PDF:** resume_{company-slug}.pdf
-**Cover letter PDF:** cover_letter_{company-slug}.pdf
+Branch: cv/{company-slug}-{role-slug}
+CV PDF: resume_{company-slug}.pdf
+Cover letter PDF: cover_letter_{company-slug}.pdf
 
-### Changes made
-- summary.tex: [what changed]
-- skills.tex: [what changed]
-- experience.tex: [what changed]
-- project.tex: [what changed]
+Evidence claims used:
+- claim_id: where used
 
-### Why you're a strong fit
-[2–3 sentences from the Why Me section — the core argument]
+Changes made:
+- summary.tex: ...
+- skills.tex: ...
+- experience.tex: ...
+- project.tex: ...
 
-### JD keywords incorporated
-[comma-separated list]
+Validation:
+- Fact validation: passed / false positives explained
+- Visual check: passed
+
+Why you're a strong fit:
+...
+
+JD keywords incorporated:
+...
 ```
 
 ---
@@ -233,7 +387,10 @@ Output a clean summary:
 ## Hard stops
 
 Stop immediately and ask the user if:
-- The JD URL fails to load
-- You're not on the `main` branch in overleaf-cv
-- The role is so far outside the background that honest tailoring isn't possible
-- A compile error persists after one fix attempt
+- The JD cannot be loaded.
+- The CV repo is not on `main`.
+- The role is too far outside the evidence bank for honest tailoring.
+- `validate_cv_facts` reports unresolved unsupported metrics.
+- A compile error persists after one fix attempt.
+- Visual check fails and fixing it would require removing essential evidence.
+- CV post-update checklist has unresolved items after one fix attempt.

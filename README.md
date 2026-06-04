@@ -11,6 +11,9 @@ Provides tools for searching, reading, and writing career knowledge from any MCP
 | Tool | Description |
 |------|-------------|
 | `search_kb` | Full-text search across all KB files |
+| `match_jd_to_evidence` | Rank structured CV evidence claims against a job description |
+| `get_claims` | Fetch exact source-bound CV claims by claim ID |
+| `validate_cv_facts` | Check CV numbers against the claim bank and flag likely metric mixing |
 | `get_project` | Fetch full project context by slug |
 | `get_style` | Retrieve writing style guide + post samples |
 | `get_current_status` | Read current career status |
@@ -120,12 +123,13 @@ Tailors the CV for a specific job application and generates a matching cover let
 
 **What it does:**
 1. Crawls the job description URL
-2. Pulls relevant context from the career KB (experience, projects, writing style)
+2. Pulls ranked evidence claims from the career KB claim bank
 3. Creates an isolated git branch in the CV repo (`cv/{company}-{role}`)
-4. Tailors CV sections to match the JD — reorders, keyword-matches, adjusts emphasis. Never fabricates facts.
+4. Tailors CV sections to match the JD using selected claim IDs — reorders, keyword-matches, adjusts emphasis. Never fabricates facts or mixes metrics across projects.
 5. Generates a cover letter with company-specific "Why them / Why me" sections
-6. Compiles both to PDF via `latexmk` and opens them
-7. Commits everything on the branch; `main` is never touched
+6. Validates CV facts against the claim bank
+7. Compiles both to PDF via `latexmk`, screenshots, and visually verifies them
+8. Commits everything on the branch; `main` is never touched
 
 **Requires:**
 - The `career-kb` MCP server configured and running (see Setup above)
