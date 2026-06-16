@@ -117,6 +117,21 @@ cp commands/tailor-cv.md ~/.claude/commands/tailor-cv.md
 
 ### Available skills
 
+#### `/prepare-post <draft/topic/event link/notes>`
+
+Prepares Alex-style LinkedIn and portfolio posts from rough notes.
+
+**What it does:**
+1. Reads the career KB writing style, profile context, and relevant prior posts
+2. Verifies time-sensitive links or event details when needed
+3. Drafts a paste-ready LinkedIn version
+4. Creates a local branch in `alexkimds.github.io` (`post/{slug}`)
+5. Adds a Jekyll portfolio post under `_posts/`
+6. Runs Prettier, Jekyll build, link checks where relevant, and browser-based visual QA
+7. Commits the local draft and keeps localhost running for visual review
+
+**Default:** local review only. It does not push, open a PR, or publish unless explicitly requested.
+
 #### `/tailor-cv <JD_URL>`
 
 Tailors the CV for a specific job application and generates a matching cover letter.
