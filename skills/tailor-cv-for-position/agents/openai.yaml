@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tailor CV for Position"
+  short_description: "Tailor role-specific CVs from evidence"
+  default_prompt: "Use $tailor-cv-for-position to tailor my LaTeX CV and cover letter for this job description."

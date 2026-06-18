@@ -6,6 +6,24 @@ The argument is: $ARGUMENTS
 
 ---
 
+## Preflight — load lessons and locate files
+
+Read the repo skill reference if it exists:
+
+```text
+/Users/alexkim/my-projects/MyCareerKB/career-kb-skills/skills/tailor-cv-for-position/references/recent-cv-lessons.md
+```
+
+Use it as the checklist of Alex's previous CV requirements and feedback.
+
+Locate the CV repo dynamically. Prefer an explicit user-provided path. Otherwise search near the
+`career-kb-skills` repo and its parent directories for `overleaf-cv*` directories containing
+`resume/summary.tex`, `resume/experience.tex`, and role-specific `resume_*.tex` files.
+
+For a new application, prefer the canonical `overleaf-cv` git repo when it is clean. Use copied
+company-specific repos such as `overleaf-cv-kraken` as references unless Alex asks to modify that
+specific working tree.
+
 ## Operating principle
 
 This command is evidence-gated. You may tailor wording and ordering, but every factual claim, number, project, company, and metric used in the CV must come from a structured CV evidence claim.
@@ -68,7 +86,13 @@ Hard stop if honest tailoring is not possible because the role is too far outsid
 
 ## Step 3 — Read the CV repo
 
-Read these files from `/Users/alexkim/my-projects/overleaf-cv/`:
+Set and record:
+
+```bash
+CV_REPO="{absolute path to selected overleaf-cv repo}"
+```
+
+Read these files from `$CV_REPO`:
 - `resume_isr.tex`
 - `resume/summary.tex`
 - `resume/skills.tex`
@@ -77,13 +101,25 @@ Read these files from `/Users/alexkim/my-projects/overleaf-cv/`:
 - `resume/education.tex`
 - `coverletter.tex`
 
-Check the branch:
+Also inspect the latest role-specific variants near `$CV_REPO` and use them as examples of current
+formatting and role framing:
 
 ```bash
-cd /Users/alexkim/my-projects/overleaf-cv && git branch --show-current
+find "$(dirname "$CV_REPO")" -maxdepth 2 -type f \( -name 'resume_*.tex' -o -name 'cover_letter_*.tex' \) -path '*/overleaf-cv*/*' -print0 \
+  | xargs -0 stat -f '%Sm %N' -t '%Y-%m-%d %H:%M:%S' \
+  | sort -r \
+  | head -40
 ```
 
-If not on `main`, warn the user and stop. Only proceed from `main`.
+If `$CV_REPO` is a git repo, check the branch:
+
+```bash
+cd "$CV_REPO" && git branch --show-current
+```
+
+If creating a new application in the canonical git repo and not on `main`, warn the user and stop.
+Only proceed from `main`. If Alex explicitly asked to update a copied company-specific working tree
+that is not a git repo, do not use branch operations and do not overwrite unrelated variants.
 
 ---
 
@@ -94,15 +130,19 @@ Derive slugs:
 - Role slug: lowercase, hyphens, key words only.
 - Branch name: `cv/{company-slug}-{role-slug}`
 
+If `$CV_REPO` is not a git repo because Alex asked to update a copied application working tree,
+skip this branch step. Otherwise:
+
 ```bash
-cd /Users/alexkim/my-projects/overleaf-cv && git checkout -b cv/{company-slug}-{role-slug}
+cd "$CV_REPO" && git checkout -b cv/{company-slug}-{role-slug}
 ```
 
 ---
 
 ## Step 5 — Create the per-application main file
 
-Copy `resume_isr.tex` to `resume_{company-slug}.tex`. Edit only the copy:
+Copy `resume_isr.tex` to `resume_{company-slug}.tex`. If the same company has multiple active
+variants, use `resume_{company-slug}_{role-slug}.tex`. Edit only the copy:
 
 1. Add `% Application: {Company} — {Role}` near the top.
 2. Set `\position{...}` to an honest role-matched title in ALL CAPS, for example `SENIOR AI ENGINEER \textbar{} AGENT SYSTEMS`.
@@ -203,7 +243,7 @@ Rules:
 
 ## Step 7 — Generate the cover letter
 
-Create `/Users/alexkim/my-projects/overleaf-cv/cover_letter_{company-slug}.tex`.
+Create `$CV_REPO/cover_letter_{company-slug}.tex`.
 
 Use `coverletter.tex` as the structural template and copy its full LaTeX preamble.
 
@@ -261,7 +301,7 @@ Then stop.
 If present:
 
 ```bash
-cd /Users/alexkim/my-projects/overleaf-cv
+cd "$CV_REPO"
 latexmk -xelatex -interaction=nonstopmode -halt-on-error resume_{company-slug}.tex 2>&1 | tail -30
 latexmk -xelatex -interaction=nonstopmode -halt-on-error cover_letter_{company-slug}.tex 2>&1 | tail -30
 open resume_{company-slug}.pdf
@@ -344,7 +384,7 @@ If visual check fails:
 ## Step 10 — Commit
 
 ```bash
-cd /Users/alexkim/my-projects/overleaf-cv
+cd "$CV_REPO"
 git add resume_{company-slug}.tex cover_letter_{company-slug}.tex resume/summary.tex resume/skills.tex resume/experience.tex resume/project.tex
 git commit -m "cv: tailor for {Company} — {Role}"
 ```
@@ -388,7 +428,8 @@ JD keywords incorporated:
 
 Stop immediately and ask the user if:
 - The JD cannot be loaded.
-- The CV repo is not on `main`.
+- No nearby CV repo containing the required LaTeX files can be located.
+- A canonical git CV repo is being used for a new application and it is not on `main`.
 - The role is too far outside the evidence bank for honest tailoring.
 - `validate_cv_facts` reports unresolved unsupported metrics.
 - A compile error persists after one fix attempt.

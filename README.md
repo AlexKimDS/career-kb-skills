@@ -151,6 +151,20 @@ Tailors the CV for a specific job application and generates a matching cover let
 - The CV repo (`overleaf-cv`) — a LaTeX project using the [Awesome-CV](https://github.com/posquit0/Awesome-CV) template that compiles to a PDF résumé. The repo holds modular `.tex` section files (`resume/summary.tex`, `resume/experience.tex`, etc.) and a per-variant main file (`resume_isr.tex`) that `\input`s them.
 - `latexmk` installed (`brew install --cask mactex-no-gui`)
 
+## Codex Skills
+
+This repo also includes Codex-style skill folders under `skills/`.
+
+### `$tailor-cv-for-position`
+
+Tailors Alex's LaTeX CV and cover letter for a specific company/role using `career-kb` evidence claims and nearby `overleaf-cv*` working trees.
+
+The skill includes a recent-feedback reference built from the latest CV variants and prior CV conversations:
+
+- latest reviewed variants: Kraken, Reflection AI, Seamflow, Wise, Expedia, and Snyk
+- recurring requirements: one-page CV and cover letter, screenshot-based visual QA, ALL-CAPS Awesome-CV titles, correct employer attribution, no metric mixing, no duplicate experience/project stories, and no internal codenames
+- repo behavior: discover the CV repo near `career-kb-skills`; prefer canonical `overleaf-cv` for new applications and use copied `overleaf-cv-*` trees as references unless explicitly selected
+
 ---
 
 ## First-time index build
