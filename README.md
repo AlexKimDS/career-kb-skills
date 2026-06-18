@@ -11,6 +11,9 @@ Provides tools for searching, reading, and writing career knowledge from any MCP
 | Tool | Description |
 |------|-------------|
 | `search_kb` | Full-text search across all KB files |
+| `match_jd_to_evidence` | Rank structured CV evidence claims against a job description |
+| `get_claims` | Fetch exact source-bound CV claims by claim ID |
+| `validate_cv_facts` | Check CV numbers against the claim bank and flag likely metric mixing |
 | `get_project` | Fetch full project context by slug |
 | `get_style` | Retrieve writing style guide + post samples |
 | `get_current_status` | Read current career status |
@@ -114,23 +117,53 @@ cp commands/tailor-cv.md ~/.claude/commands/tailor-cv.md
 
 ### Available skills
 
+#### `/prepare-post <draft/topic/event link/notes>`
+
+Prepares Alex-style LinkedIn and portfolio posts from rough notes.
+
+**What it does:**
+1. Reads the career KB writing style, profile context, and relevant prior posts
+2. Verifies time-sensitive links or event details when needed
+3. Drafts a paste-ready LinkedIn version
+4. Creates a local branch in `alexkimds.github.io` (`post/{slug}`)
+5. Adds a Jekyll portfolio post under `_posts/`
+6. Runs Prettier, Jekyll build, link checks where relevant, and browser-based visual QA
+7. Commits the local draft and keeps localhost running for visual review
+
+**Default:** local review only. It does not push, open a PR, or publish unless explicitly requested.
+
 #### `/tailor-cv <JD_URL>`
 
 Tailors the CV for a specific job application and generates a matching cover letter.
 
 **What it does:**
 1. Crawls the job description URL
-2. Pulls relevant context from the career KB (experience, projects, writing style)
+2. Pulls ranked evidence claims from the career KB claim bank
 3. Creates an isolated git branch in the CV repo (`cv/{company}-{role}`)
-4. Tailors CV sections to match the JD — reorders, keyword-matches, adjusts emphasis. Never fabricates facts.
+4. Tailors CV sections to match the JD using selected claim IDs — reorders, keyword-matches, adjusts emphasis. Never fabricates facts or mixes metrics across projects.
 5. Generates a cover letter with company-specific "Why them / Why me" sections
-6. Compiles both to PDF via `latexmk` and opens them
-7. Commits everything on the branch; `main` is never touched
+6. Validates CV facts against the claim bank
+7. Compiles both to PDF via `latexmk`, screenshots, and visually verifies them
+8. Commits everything on the branch; `main` is never touched
 
 **Requires:**
 - The `career-kb` MCP server configured and running (see Setup above)
 - The CV repo (`overleaf-cv`) — a LaTeX project using the [Awesome-CV](https://github.com/posquit0/Awesome-CV) template that compiles to a PDF résumé. The repo holds modular `.tex` section files (`resume/summary.tex`, `resume/experience.tex`, etc.) and a per-variant main file (`resume_isr.tex`) that `\input`s them.
 - `latexmk` installed (`brew install --cask mactex-no-gui`)
+
+## Codex Skills
+
+This repo also includes Codex-style skill folders under `skills/`.
+
+### `$tailor-cv-for-position`
+
+Tailors Alex's LaTeX CV and cover letter for a specific company/role using `career-kb` evidence claims and nearby `overleaf-cv*` working trees.
+
+The skill includes a recent-feedback reference built from the latest CV variants and prior CV conversations:
+
+- latest reviewed variants: Kraken, Reflection AI, Seamflow, Wise, Expedia, and Snyk
+- recurring requirements: one-page CV and cover letter, screenshot-based visual QA, ALL-CAPS Awesome-CV titles, correct employer attribution, no metric mixing, no duplicate experience/project stories, and no internal codenames
+- repo behavior: discover the CV repo near `career-kb-skills`; prefer canonical `overleaf-cv` for new applications and use copied `overleaf-cv-*` trees as references unless explicitly selected
 
 ---
 
